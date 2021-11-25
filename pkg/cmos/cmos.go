@@ -16,18 +16,24 @@ const (
 	cmosDataPort = 0x71
 )
 
+var (
+	// Setup global variable for function call to test
+	memioOut = memio.Out
+	memioIn  = memio.In
+)
+
 // Read reads a register reg from CMOS into data.
 func Read(reg memio.Uint8, data memio.UintN) error {
-	if err := memio.Out(cmosRegPort, &reg); err != nil {
+	if err := memioOut(cmosRegPort, &reg); err != nil {
 		return err
 	}
-	return memio.In(cmosDataPort, data)
+	return memioIn(cmosDataPort, data)
 }
 
 // Write writes value data into CMOS register reg.
 func Write(reg memio.Uint8, data memio.UintN) error {
-	if err := memio.Out(cmosRegPort, &reg); err != nil {
+	if err := memioOut(cmosRegPort, &reg); err != nil {
 		return err
 	}
-	return memio.Out(cmosDataPort, data)
+	return memioOut(cmosDataPort, data)
 }
