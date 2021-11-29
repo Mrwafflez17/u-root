@@ -82,6 +82,17 @@ func TestFromZip(t *testing.T) {
 	require.Equal(t, x, f4Expected)
 }
 
+func TestFromZipNoValidFile(t *testing.T) {
+	f, err := ioutil.TempFile("", "testfile-")
+	if err != nil {
+		t.Error(err)
+	}
+	defer f.Close()
+	if err := FromZip(f.Name(), "someDir"); err == nil {
+		t.Errorf("FromZip succeeded but shouldn't")
+	}
+}
+
 func TestAppendZip(t *testing.T) {
 	_, err := os.Create("appendTest.zip")
 	if err != nil {
@@ -91,6 +102,23 @@ func TestAppendZip(t *testing.T) {
 
 	if err := AppendZip("testdata/testFolder", "appendTest.zip", "Test append zip"); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestAppendZipNoDir1(t *testing.T) {
+	if err := AppendZip("doesNotExist", "alsoNotExist", "Whythough"); err == nil {
+		t.Error("AppendZip succeeded but shouldn't")
+	}
+}
+
+func TestAppendZipNoDir2(t *testing.T) {
+	f, err := ioutil.TempFile("", "testfile")
+	if err != nil {
+		t.Errorf("creating testfile failed: %v", err)
+	}
+	defer f.Close()
+	if err := AppendZip(f.Name(), f.Name(), "no comment"); err == nil {
+		t.Error("AppendZip succeeded but shouldn't")
 	}
 }
 
@@ -107,4 +135,15 @@ func TestToZip(t *testing.T) {
 		t.Error(err)
 	}
 	defer os.Remove("testfile.zip")
+}
+
+func TestToZipInvalidDir(t *testing.T) {
+	f, err := ioutil.TempFile("", "testfile-")
+	if err != nil {
+		t.Error(err)
+	}
+	defer f.Close()
+	if err := ToZip(f.Name(), "invalid", "no need"); err == nil {
+		t.Errorf("ToZip succeeded but shouldn't")
+	}
 }
