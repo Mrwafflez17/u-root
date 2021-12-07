@@ -5,12 +5,12 @@
 package uzip
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestFromZip(t *testing.T) {
@@ -25,7 +25,9 @@ func TestFromZip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.NotEmpty(t, z)
+	if len(z) < 1 {
+		t.Errorf("no content read from file %q", f)
+	}
 
 	out := filepath.Join(tmpDir, "unziped")
 	if err := os.MkdirAll(out, os.ModePerm); err != nil {
@@ -58,28 +60,38 @@ func TestFromZip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.FileExists(t, f1)
-	require.FileExists(t, f2)
-	require.FileExists(t, f3)
-	require.FileExists(t, f4)
-
 	var x []byte
 
-	x, err = os.ReadFile(f1)
-	require.NoError(t, err)
-	require.Equal(t, x, f1Expected)
+	x, err = ioutil.ReadFile(f1)
+	if err != nil {
+		t.Errorf("open file: %q failed with: %q", f1, err)
+	}
+	if !bytes.Equal(x, f1Expected) {
+		t.Errorf("file %q and file %q are not equal", f1, "testdata/testFolder/file1")
+	}
+	x, err = ioutil.ReadFile(f2)
+	if err != nil {
+		t.Errorf("open file: %q failed with: %q", f2, err)
+	}
+	if !bytes.Equal(x, f2Expected) {
+		t.Errorf("file %q and file %q are not equal", f2, "testdata/testFolder/file2")
+	}
 
-	x, err = os.ReadFile(f2)
-	require.NoError(t, err)
-	require.Equal(t, x, f2Expected)
+	x, err = ioutil.ReadFile(f3)
+	if err != nil {
+		t.Errorf("open file: %q failed with: %q", f3, err)
+	}
+	if !bytes.Equal(x, f3Expected) {
+		t.Errorf("file %q and file %q are not equal", f3, "testdata/testFolder/file3")
+	}
 
-	x, err = os.ReadFile(f3)
-	require.NoError(t, err)
-	require.Equal(t, x, f3Expected)
-
-	x, err = os.ReadFile(f4)
-	require.NoError(t, err)
-	require.Equal(t, x, f4Expected)
+	x, err = ioutil.ReadFile(f4)
+	if err != nil {
+		t.Errorf("open file: %q failed with: %q", f4, err)
+	}
+	if !bytes.Equal(x, f4Expected) {
+		t.Errorf("file %q and file %q are not equal", f4, "testdata/testFolder/file4")
+	}
 }
 
 func TestFromZipNoValidFile(t *testing.T) {
