@@ -26,12 +26,14 @@ io (rtcw index value)... # write value to RTC register index [0-13]
 	addCmd(writeCmds, "rtcw", &cmd{rtcWrite, 7, 8})
 }
 
+var c = cmos.GetCMOS()
+
 func cmosRead(reg int64, data memio.UintN) error {
 	regVal := memio.Uint8(reg)
 	if regVal < 14 {
 		return fmt.Errorf("byte %d is inside the range 0-13 which is reserved for RTC", regVal)
 	}
-	return cmos.Read(regVal, data)
+	return c.Read(regVal, data)
 }
 
 func cmosWrite(reg int64, data memio.UintN) error {
@@ -39,7 +41,7 @@ func cmosWrite(reg int64, data memio.UintN) error {
 	if regVal < 14 {
 		return fmt.Errorf("byte %d is inside the range 0-13 which is reserved for RTC", regVal)
 	}
-	return cmos.Write(regVal, data)
+	return c.Write(regVal, data)
 }
 
 func rtcRead(reg int64, data memio.UintN) error {
@@ -47,7 +49,7 @@ func rtcRead(reg int64, data memio.UintN) error {
 	if regVal > 13 {
 		return fmt.Errorf("byte %d is outside the range 0-13 reserved for RTC", regVal)
 	}
-	return cmos.Read(regVal, data)
+	return c.Read(regVal, data)
 }
 
 func rtcWrite(reg int64, data memio.UintN) error {
@@ -55,5 +57,5 @@ func rtcWrite(reg int64, data memio.UintN) error {
 	if regVal > 13 {
 		return fmt.Errorf("byte %d is outside the range 0-13 reserved for RTC", regVal)
 	}
-	return cmos.Write(regVal, data)
+	return c.Write(regVal, data)
 }
