@@ -5,24 +5,53 @@
 package main
 
 import (
-	"os"
+	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/u-root/u-root/pkg/testutil"
 )
 
 func TestDmesg(t *testing.T) {
-	if uid := os.Getuid(); uid != 0 {
-		t.Skipf("test requires root on CircleCI, your uid is %d", uid)
+	testutil.SkipIfNotRoot(t)
+	for _, tt := range []struct {
+		name      string
+		clear     bool
+		readClear bool
+		want      error
+	}{
+		{
+			name:      "both flags set",
+			clear:     true,
+			readClear: true,
+			want:      fmt.Errorf("cannot specify both -clear and -read-clear"),
+		},
+		{
+			name:      "clear log",
+			clear:     true,
+			readClear: false,
+			want:      fmt.Errorf(""),
+		},
+		{
+			name:      "clear log after printing",
+			clear:     false,
+			readClear: true,
+			want:      fmt.Errorf(""),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			*clear = tt.clear
+			*readClear = tt.readClear
+			buf := &bytes.Buffer{}
+			if got := dmesg(buf); got != nil {
+				if got.Error() != tt.want.Error() {
+					t.Errorf("dmesg() = '%v', want: '%v'", got, tt.want)
+				}
+			} else {
+				if buf.String() != "" && (*clear || *readClear) {
+					t.Errorf("System log should be cleared")
+				}
+			}
+		})
 	}
-
-	cmd := testutil.Command(t)
-	out, err := cmd.Output()
-	if err != nil || len(out) == 0 {
-		t.Fatal(err)
-	}
-}
-
-func TestMain(m *testing.M) {
-	testutil.Run(m, main)
 }
