@@ -6,7 +6,6 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"strconv"
 
@@ -30,9 +29,7 @@ func parseDevices(args []string, devtype string) (int, error) {
 	return int(unix.Mkdev(uint32(major), uint32(minor))), nil
 }
 
-func mknod() error {
-	flag.Parse()
-	a := flag.Args()
+func mknod(a []string) error {
 	if len(a) != 2 && len(a) != 4 {
 		return errors.New("usage: mknod path type [major minor]")
 	}
