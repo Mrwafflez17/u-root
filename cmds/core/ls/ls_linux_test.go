@@ -5,11 +5,13 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
-	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/u-root/u-root/pkg/ls"
 	"github.com/u-root/u-root/pkg/testutil"
 	"golang.org/x/sys/unix"
 )
@@ -23,26 +25,54 @@ import (
 //     = mkdev(0x456, 0x12378)
 //     = (0x12378 & 0xff) | (0x456 << 8) | ((0x12378 & ~0xff) << 12)
 //     = 0x12345678
-func TestLargeDevNumber(t *testing.T) {
-	if uid := os.Getuid(); uid != 0 {
-		t.Skipf("test requires root, your uid is %d", uid)
-	}
 
-	// Make the node.
-	tmpDir := t.TempDir()
-	file := filepath.Join(tmpDir, "large_node")
-	if err := unix.Mknod(file, 0o660|unix.S_IFBLK, 0x12345678); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(file)
-
-	// Run "ls -l large_node".
-	out, err := testutil.Command(t, "-l", file).Output()
+// Test listName func
+func TestListNameLinux(t *testing.T) {
+	testutil.SkipIfNotRoot(t)
+	// Create a directory
+	d, err := os.MkdirTemp(os.TempDir(), "li.st")
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("Failed to create tmp dir: %v", err)
 	}
-	expected := regexp.MustCompile(`^\S+ \S+ \S+ 1110, 74616`)
-	if !expected.Match(out) {
-		t.Fatal("expected device number (1110, 74616), got:\n" + string(out))
+	if err := unix.Mknod(filepath.Join(d, "large_node"), 0o660|unix.S_IFBLK, 0x12345678); err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(d)
+
+	// Creating test table
+	for _, tt := range []struct {
+		name   string
+		input  string
+		output string
+		long   bool
+		prefix bool
+	}{
+		{
+			name:   "ls with large node",
+			input:  d,
+			output: "1110, 74616",
+			long:   true,
+		},
+	} {
+		// Setting the flags
+		*long = tt.long
+		// Running the tests
+		t.Run(tt.name, func(t *testing.T) {
+			// Write output in buffer.
+			var buf bytes.Buffer
+
+			var s ls.Stringer = ls.NameStringer{}
+			if *quoted {
+				s = ls.QuotedStringer{}
+			}
+			if *long {
+				s = ls.LongStringer{Human: *human, Name: s}
+			}
+			_ = listName(s, tt.input, &buf, tt.prefix)
+			if !strings.Contains(buf.String(), tt.output) {
+				t.Errorf("Expected value: %v, got: %v", tt.output, buf.String())
+			}
+
+		})
 	}
 }
