@@ -1,148 +1,42 @@
-version: 2
+# Use the latest 2.1 version of CircleCI pipeline process engine.
+# See: https://circleci.com/docs/2.0/configuration-reference
+version: 2.1
 
-templates:
-  golang-template: &golang-template
-    docker:
-      - image: uroottest/test-image-amd64:v4.4.0
-    working_directory: /go/src/github.com/u-root/u-root
-    environment:
-      - CGO_ENABLED: 0
-      # Triple all timeouts for QEMU VM tests since they run without KVM.
-      - UROOT_QEMU_TIMEOUT_X: 3
-      - GO111MODULE: "off"
-
-  integration-template: &integration-template
-    working_directory: /go/src/github.com/u-root/u-root
-    environment:
-      - CGO_ENABLED: 0
-      # x5 all timeouts for QEMU VM tests since they run without KVM.
-      - UROOT_QEMU_TIMEOUT_X: 5
-      - GO111MODULE: "off"
-    steps:
-      - checkout
-      - run:
-          name: Test integration
-          command: UROOT_QEMU_COVERPROFILE=coverage.txt go test -a -v -timeout 15m -ldflags '-s' ./integration/...
-          no_output_timeout: 15m
-      - run:
-          name: Upload integration coverage
-          command: bash <(curl -s https://codecov.io/bash)
-
-  beefy-template: &beefy-template
-    <<: *golang-template
-    resource_class: large
-
-workflows:
-  version: 2
-  build_and_test:
-    jobs:
-      - test
-      - test-build
-      - test-integration-amd64
-      - test-integration-arm
-      - test-integration-arm64
-      - race
-      - compile_cmds
-      - check_templates
-      - check_licenses
-
+# Define a job to be invoked later in a workflow.
+# See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  test:
-    <<: *golang-template
-    <<: *beefy-template
+  build:
+    working_directory: ~/repo
+    # Specify the execution environment. You can specify an image from Dockerhub or use one of our Convenience Images from CircleCI's Developer Hub.
+    # See: https://circleci.com/docs/2.0/configuration-reference/#docker-machine-macos-windows-executor
+    docker:
+      - image: circleci/golang:1.15.8
+    # Add steps to the job
+    # See: https://circleci.com/docs/2.0/configuration-reference/#steps
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
       - run:
-          name: Test Packages
-          command: go test -v -a -timeout 15m -ldflags '-s' -coverprofile=coverage_pkg.txt -covermode=atomic -coverpkg=./pkg/... ./pkg/...
-          no_output_timeout: 15m
-
+          name: Install Dependencies
+          command: go mod download
+      - save_cache:
+          key: go-mod-v4-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
       - run:
-          name: Test coverage
-          command: UROOT_QEMU_COVERPROFILE=vmcoverage.txt go test -timeout=15m -coverprofile=coverage.txt -covermode=atomic -cover ./cmds/... ./pkg/...
-
-      - run:
-          name: Upload coverage
-          command: bash <(curl -s https://codecov.io/bash)
-
-  test-build:
-    <<: *beefy-template
-    steps:
-      - checkout
-      - run:
-          name: Test u-root build
-          command: go test -a -timeout 15m .
-          no_output_timeout: 15m
-
-  race:
-    <<: *golang-template
-    environment:
-      - CGO_ENABLED: 1
-      - GO111MODULE: "off"
-    steps:
-      - checkout
-      - run:
-          name: Race detector
-          command: go test -race ./cmds/... ./pkg/...
-
-  compile_cmds:
-    <<: *golang-template
-    steps:
-      - checkout
-      - run:
-          name: build all tools
+          name: Run tests
           command: |
-            cd cmds
-            go install -a ./...
-            cd ../tools
-            go install -a ./...
-  check_licenses:
-    <<: *golang-template
-    steps:
-      - checkout
-      - run:
-          name: Check licenses
-          command: go run tools/checklicenses/checklicenses.go -c tools/checklicenses/config.json
-  check_symlinks:
-    <<: *golang-template
-    steps:
-      - checkout
-      - run:
-          name: Symbol tests to ensure we do not break symlink handling
-          command: mkdir /tmp/usr && ln -s /tmp/usr/x /tmp/usr/y && go run u-root.go -build=bb -files /tmp/usr minimal
-  check_templates:
-    <<: *golang-template
-    steps:
-      - checkout
-      - run:
-          name: Ensure that every template builds for a variety of options.
-          command: |
-                  go build .
-                  goruncmd="./u-root -stats-output-path=/tmp/stats.json"
-                  $goruncmd -build=bb minimal
-                  $goruncmd -build=bb core
-                  $goruncmd -build=bb coreboot-app
-                  $goruncmd -build=bb all
-                  $goruncmd -build=bb world
-                  # Fails because of dups. Is this supposed to work?
-                  #$goruncmd -build=bb all core
-                  #$goruncmd all core
-                  GOOS=plan9 $goruncmd -defaultsh=/bbin/rush plan9
-                  cat /tmp/stats.json
-      - store_artifacts:
-          name: Store build stats
-          path: /tmp/stats.json
-          destination: stats.json
-  test-integration-amd64:
-    <<: *integration-template
-    docker:
-      - image: uroottest/test-image-amd64:v4.4.0
-  test-integration-arm:
-    <<: *integration-template
-    docker:
-      - image: uroottest/test-image-arm:v4.4.0
-  test-integration-arm64:
-    <<: *integration-template
-    docker:
-      - image: uroottest/test-image-arm64:v4.4.0
-    working_directory: /home/circleci/go/src/github.com/u-root/u-root
+            mkdir -p /tmp/test-reports
+            gotestsum --junitfile /tmp/test-reports/unit-tests.xml
+      - store_test_results:
+          path: /tmp/test-reports
+
+# Invoke jobs via workflows
+# See: https://circleci.com/docs/2.0/configuration-reference/#workflows
+workflows:
+  sample: # This is the name of the workflow, feel free to change it to better match your workflow.
+    # Inside the workflow, you define the jobs you want to run.
+    jobs:
+      - build
